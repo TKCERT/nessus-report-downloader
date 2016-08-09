@@ -1,26 +1,11 @@
 #!/usr/bin/env ruby
 #################################################################################################
-# Name: Nessus 6 Report Downloader
-# Author: Travis Lee
 #
-# Version: 1.0
-# Last Updated: 2/28/2016
-#
-# Description:  Interactive script that connects to a specified Nessus 6 server using the
-#		Nessus REST API to automate mass report downloads. It has the ability to download
-#		multiple or all reports/file types/chapters and save them to a folder of
-#		your choosing. This has been tested with Nessus 6.5.5 and *should* work with
-#		Nessus 6+, YMMV.
-#
-#		File types include: NESSUS, HTML, PDF, CSV, and DB. 
-#
-#		Chapter types include: Vulnerabilities By Plugin, Vulnerabilities By Host, 
-#		Hosts Summary (Executive), Suggested Remediations, Compliance Check (Executive), 
-#		and Compliance Check.
-#
-# Usage: ruby ./nessus6-report-downloader.rb
-#
-# Reference: https://<nessus-server>:8834/api
+# Original script can be found here: https://github.com/eelsivart/nessus-report-downloader
+#  
+# Script was extended for usage with command line options and to automaticly download files
+# from a give number of the last days (now-x). 
+# This is needed for the usage of the script with cronjobs.
 #
 #################################################################################################
 
@@ -29,6 +14,9 @@ require 'fileutils'
 require 'io/console'
 require 'date'
 require 'json'
+require 'openssl'
+require 'optparse'
+require 'date'
 
 # This method will download the specified file type from specified reports
 def report_download(http, headers, reports, reports_to_dl, filetypes_to_dl, chapters_to_dl, rpath, db_export_pw)
@@ -117,6 +105,38 @@ def get_report_list(http, headers)
 	end
 end
 
+# return a list of all reports of the last x days
+def get_report_list_lastdays(http, headers, days)
+	begin
+		# Try and do stuff
+		path = "/scans"
+		d=days.to_i
+		now = Date.today
+		sometimes = now - d
+		puts sometimes
+		t=sometimes.to_time.to_i
+		data = "?last_modification_date="+t.to_s
+		resp = http.get(path+data, headers)
+
+		#puts "Number of reports found: #{reports.count}\n\n"
+
+		results = JSON.parse(resp.body)
+
+		printf("%-7s %-50s %-30s %-15s\n", "Scan ID", "Name", "Last Modified", "Status")
+		printf("%-7s %-50s %-30s %-15s\n", "-------", "----", "-------------", "------")
+
+		# print out all the reports
+		results["scans"].each do |scan|
+			printf("%-7s %-50s %-30s %-15s\n", scan["id"], scan["name"], DateTime.strptime(scan["last_modification_date"].to_s,'%s').strftime('%b %e, %Y %H:%M %Z'), scan["status"])
+		end
+		return results
+		
+	rescue StandardError => get_scanlist_error
+		puts "\n\nError getting scan list: #{get_scanlist_error}\n\n"
+		exit
+	end
+end
+
 
 # This method will make the initial login request and set the token value to use for subsequent requests
 def get_token(http, username, password)
@@ -145,15 +165,40 @@ end
 
 ### MAIN ###
 
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: nessus6-report-downloader.rb [options]"
+
+  opts.on('-s', '--server SERVER', 'server ip') { |v| options[:server] = v }
+  opts.on('-p', '--port PORT', 'server port')   { |v| options[:port] = v }
+  opts.on('-u', '--user username', 'login username') { |v| options[:user] = v }
+  opts.on('-w', '--pass password', 'login password') { |v| options[:pass] = v }
+  opts.on('-t', '--type report-type', 'report type') { |v| options[:type] = v }
+  opts.on('-l', '--path localpath', 'local file path for saving the reports') { |v| options[:path] = v }
+  opts.on('-d', '--days DAYS', 'automatically downloads reports from the last x days, 0=today 1=yesterday and so on') { |v| options[:days] = v }
+
+end.parse!
+
 puts "\nNessus 6 Report Downloader 1.0"
 
 # Collect server info
-print "\nEnter the Nessus Server IP: "
-nserver = gets.chomp.to_s
-print "Enter the Nessus Server Port [8834]: "
-nserverport = gets.chomp.to_s
-if nserverport.eql?("")
-	nserverport = "8834"
+if options[:server] == nil
+	print "\nEnter the Nessus Server IP: "
+	nserver = gets.chomp.to_s
+else
+	nserver = options[:server].chomp.to_s
+	puts nserver
+end
+
+if options[:port] == nil
+	print "Enter the Nessus Server Port [8834]: "
+	nserverport = gets.chomp.to_s
+	if nserverport.eql?("")
+		nserverport = "8834"
+	end
+else
+	nserverport = options[:port].chomp.to_s
+	puts nserverport
 end
 
 # https object
@@ -162,19 +207,37 @@ http.use_ssl = true
 http.verify_mode = OpenSSL::SSL::VERIFY_NONE	
 
 # Collect user/pass info
-print "Enter your Nessus Username: "
-username = gets.chomp.to_s
-print "Enter your Nessus Password (will not echo): "
-password = STDIN.noecho(&:gets).chomp.to_s
+if options[:user] == nil
+	print "Enter your Nessus Username: "
+	username = gets.chomp.to_s
+else 
+	username = options[:user].chomp.to_s
+	puts username
+end
+
+if options[:pass] == nil
+	print "Enter your Nessus Password (will not echo): "
+	password = STDIN.noecho(&:gets).chomp.to_s
+else
+	password = options[:pass].chomp.to_s
+	puts password
+end
 
 # login and get token cookie
 headers = get_token(http, username, password)
 
 # get list of reports
-puts "\n\nGetting report list..."
-reports = get_report_list(http, headers)
-print "Enter the report(s) your want to download (comma separate list) or 'all': "
-reports_to_dl = (gets.chomp.to_s).split(",")
+if options[:days] == nil
+	puts "\n\nGetting report list..."
+	reports = get_report_list(http, headers)
+	print "Enter the report(s) your want to download (comma separate list) or 'all': "
+	reports_to_dl = (gets.chomp.to_s).split(",")
+else
+	puts "\n\nGetting report list..."
+	reports = get_report_list_lastdays(http, headers, options[:days])
+	print "Enter the report(s) your want to download (comma separate list) or 'all': "
+	reports_to_dl = (gets.chomp.to_s).split(",")	
+end
 
 if reports_to_dl.count == 0
 	puts "\nError! You need to choose at least one report!\n\n"
