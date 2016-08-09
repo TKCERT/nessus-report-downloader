@@ -225,6 +225,8 @@ end
 
 # login and get token cookie
 headers = get_token(http, username, password)
+reports=""
+reports_to_dl=""
 
 # get list of reports
 if options[:days] == nil
@@ -235,8 +237,8 @@ if options[:days] == nil
 else
 	puts "\n\nGetting report list..."
 	reports = get_report_list_lastdays(http, headers, options[:days])
-	print "Enter the report(s) your want to download (comma separate list) or 'all': "
-	reports_to_dl = (gets.chomp.to_s).split(",")	
+	#print "Enter the report(s) your want to download (comma separate list) or 'all': "
+	reports_to_dl = "all".split(",")	
 end
 
 if reports_to_dl.count == 0
@@ -244,108 +246,119 @@ if reports_to_dl.count == 0
 	exit
 end
 
-# select file types to download
-puts "\nChoose File Type(s) to Download: "
-puts "[0] Nessus (No chapter selection)"
-puts "[1] HTML"
-puts "[2] PDF"
-puts "[3] CSV (No chapter selection)"
-puts "[4] DB (No chapter selection)"
-print "Enter the file type(s) you want to download (comma separate list) or 'all': "
-filetypes_to_dl = (gets.chomp.to_s).split(",")
 
-if filetypes_to_dl.count == 0
-	puts "\nError! You need to choose at least one file type!\n\n"
-	exit
-end
+if options[:days] == nil
+	# select file types to download
+	puts "\nChoose File Type(s) to Download: "
+	puts "[0] Nessus (No chapter selection)"
+	puts "[1] HTML"
+	puts "[2] PDF"
+	puts "[3] CSV (No chapter selection)"
+	puts "[4] DB (No chapter selection)"
+	print "Enter the file type(s) you want to download (comma separate list) or 'all': "
+	filetypes_to_dl = (gets.chomp.to_s).split(",")
 
-# see which file types to download
-formats = []
-cSelect = false
-dbSelect = false
-filetypes_to_dl.each do |ft|
-	case ft.strip
-	when "all"
-	  formats.push("nessus")
-	  formats.push("html")
-	  formats.push("pdf")
-	  formats.push("csv")
-	  formats.push("db")
-	  cSelect = true
-	  dbSelect = true
-	when "0"
-	  formats.push("nessus")
-	when "1"
-	  formats.push("html")
-  	  cSelect = true
-	when "2"
-	  formats.push("pdf")
-	  cSelect = true
-	when "3"
-	  formats.push("csv")
-	when "4"
-	  formats.push("db")
-	  dbSelect = true
-	end
-end
-
-# enter password used to encrypt db exports (required)
-db_export_pw = ""
-if dbSelect
-	print "\nEnter a Password to encrypt the DB export (will not echo): "
-	db_export_pw = STDIN.noecho(&:gets).chomp.to_s
-	print "\n"
-end
-
-# select chapters to include, only show if html or pdf is in file type selection
-chapters = ""
-if cSelect
-	puts "\nChoose Chapter(s) to Include: "
-	puts "[0] Vulnerabilities By Plugin"
-	puts "[1] Vulnerabilities By Host"
-	puts "[2] Hosts Summary (Executive)"
-	puts "[3] Suggested Remediations"
-	puts "[4] Compliance Check (Executive)"
-	puts "[5] Compliance Check"
-	print "Enter the chapter(s) you want to include (comma separate list) or 'all': "
-	chapters_to_dl = (gets.chomp.to_s).split(",")
-
-	if chapters_to_dl.count == 0
-		puts "\nError! You need to choose at least one chapter!\n\n"
+	if filetypes_to_dl.count == 0
+		puts "\nError! You need to choose at least one file type!\n\n"
 		exit
 	end
 
-	# see which chapters to download
-	chapters_to_dl.each do |chap|
-		case chap.strip
+	# see which file types to download
+	formats = []
+	cSelect = false
+	dbSelect = false
+	filetypes_to_dl.each do |ft|
+		case ft.strip
 		when "all"
-		  chapters << "vuln_hosts_summary;vuln_by_plugin;vuln_by_host;remediations;compliance_exec;compliance;"
+		  formats.push("nessus")
+		  formats.push("html")
+		  formats.push("pdf")
+		  formats.push("csv")
+		  formats.push("db")
+		  cSelect = true
+		  dbSelect = true
 		when "0"
-		  chapters << "vuln_by_plugin;"
+		  formats.push("nessus")
 		when "1"
-		  chapters << "vuln_by_host;"
+		  formats.push("html")
+	  	  cSelect = true
 		when "2"
-		  chapters << "vuln_hosts_summary;"
+		  formats.push("pdf")
+		  cSelect = true
 		when "3"
-		  chapters << "remediations;"
+		  formats.push("csv")
 		when "4"
-		  chapters << "compliance_exec;"
-		when "5"
-		  chapters << "compliance;"
+		  formats.push("db")
+		  dbSelect = true
 		end
 	end
-end
 
-# create report folder
-print "\nPath to save reports to (without trailing slash): "
-rpath = gets.chomp.to_s
-unless File.directory?(rpath)
-	FileUtils.mkdir_p(rpath)
-end
+	# enter password used to encrypt db exports (required)
+	db_export_pw = ""
+	if dbSelect
+		print "\nEnter a Password to encrypt the DB export (will not echo): "
+		db_export_pw = STDIN.noecho(&:gets).chomp.to_s
+		print "\n"
+	end
 
-# run report download
-if formats.count > 0
+	# select chapters to include, only show if html or pdf is in file type selection
+	chapters = ""
+	if cSelect
+		puts "\nChoose Chapter(s) to Include: "
+		puts "[0] Vulnerabilities By Plugin"
+		puts "[1] Vulnerabilities By Host"
+		puts "[2] Hosts Summary (Executive)"
+		puts "[3] Suggested Remediations"
+		puts "[4] Compliance Check (Executive)"
+		puts "[5] Compliance Check"
+		print "Enter the chapter(s) you want to include (comma separate list) or 'all': "
+		chapters_to_dl = (gets.chomp.to_s).split(",")
+
+		if chapters_to_dl.count == 0
+			puts "\nError! You need to choose at least one chapter!\n\n"
+			exit
+		end
+
+		# see which chapters to download
+		chapters_to_dl.each do |chap|
+			case chap.strip
+			when "all"
+			  chapters << "vuln_hosts_summary;vuln_by_plugin;vuln_by_host;remediations;compliance_exec;compliance;"
+			when "0"
+			  chapters << "vuln_by_plugin;"
+			when "1"
+			  chapters << "vuln_by_host;"
+			when "2"
+			  chapters << "vuln_hosts_summary;"
+			when "3"
+			  chapters << "remediations;"
+			when "4"
+			  chapters << "compliance_exec;"
+			when "5"
+			  chapters << "compliance;"
+			end
+		end
+	end
+
+	# create report folder
+	print "\nPath to save reports to (without trailing slash): "
+	rpath = gets.chomp.to_s
+	unless File.directory?(rpath)
+		FileUtils.mkdir_p(rpath)
+	end
+
+	# run report download
+	if formats.count > 0
+		report_download(http, headers, reports, reports_to_dl, formats, chapters, rpath, db_export_pw)
+	end
+
+	puts "\nReport Download Completed!\n\n"
+else
+	formats = []
+	cSelect = false
+	dbSelect = false
+	formats.push("nessus")
+	rpath = options[:path]
 	report_download(http, headers, reports, reports_to_dl, formats, chapters, rpath, db_export_pw)
+	puts "\nReport Download Completed!\n\n"
 end
-
-puts "\nReport Download Completed!\n\n"
