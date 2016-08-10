@@ -4,7 +4,7 @@
 # Original script can be found here: https://github.com/eelsivart/nessus-report-downloader
 #  
 # Script was extended for usage with command line options and to automaticly download files
-# from a give number of the last days (now-x). 
+# from a given number of the last days (now-x). 
 # This is needed for the usage of the script with cronjobs.
 #
 #################################################################################################
@@ -175,7 +175,7 @@ OptionParser.new do |opts|
   opts.on('-w', '--pass password', 'login password') { |v| options[:pass] = v }
   opts.on('-t', '--type report-type', 'report type') { |v| options[:type] = v }
   opts.on('-l', '--path localpath', 'local file path for saving the reports') { |v| options[:path] = v }
-  opts.on('-d', '--days DAYS', 'automatically downloads reports from the last x days, 0=today 1=yesterday and so on') { |v| options[:days] = v }
+  opts.on('-d', '--days DAYS', 'automatically downloads reports (nessus format) from the last x days, 0=today 1=yesterday and so on') { |v| options[:days] = v }
 
 end.parse!
 

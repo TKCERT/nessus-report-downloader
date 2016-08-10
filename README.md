@@ -1,3 +1,14 @@
+Original script can be found here: https://github.com/eelsivart/nessus-report-downloader
+Script was extended for usage with command line options and to automaticly download files
+from a given number of the last days (now-x). 
+This is needed for the usage of the script with cronjobs.
+Sample usage, download reports in nessus format from the last 30 days:
+# ./nessus6-report-downloader.rb -s "server" -p 8834 -u "uid" -w "password" -d 30 -l .
+
+
+========================================
+
+
 Name: Nessus 6 Report Downloader
 
 Author: Travis Lee
